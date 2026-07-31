@@ -21,16 +21,8 @@
     'use strict';
 
     const STORAGE_KEY = 'astro_alliance_checkpoint_v1';
-    const DISCORD_CHUNK_LIMIT = 1900; // margen de seguridad bajo el límite real de 2000
+    const DISCORD_CHUNK_LIMIT = 1900;
 
-    // La variable JS `window.serverTime` da un valor desfasado ~2h (parece
-    // construida mal por el propio juego, o el userscript no comparte su
-    // scope léxico si se declaró con let/const en vez de colgarla de window
-    // - mismo problema de aislamiento que ya vimos en Astro ROI). El reloj
-    // fiable es el que el juego pinta en el DOM (.servertimeTop, cabecera
-    // compartida en todas las páginas): es el mismo para cualquier usuario
-    // sin importar su huso horario de navegador, así que es el que hay que
-    // usar como referencia al compartir checkpoints/informes con la alianza.
     function getServerNowFromDom() {
         const el = document.querySelector('.servertimeTop');
         if (!el) return null;
@@ -51,9 +43,6 @@
         return Date.now();
     }
 
-    // ---------------------------------------------------------------
-    // Lectura de la tabla de miembros (ya está en el DOM, sin fetch)
-    // ---------------------------------------------------------------
     function parseMemberList() {
         const rows = document.querySelectorAll('#memberList tbody tr');
         const members = {};
@@ -82,11 +71,6 @@
         return members;
     }
 
-    // ---------------------------------------------------------------
-    // Almacenamiento: UN ÚNICO punto de control (no una lista que avanza
-    // sola). "Generar informe" solo LEE este punto de control y compara;
-    // "Nuevo punto de control" es la única acción que lo sobrescribe.
-    // ---------------------------------------------------------------
     function loadCheckpoint() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -110,9 +94,6 @@
         localStorage.removeItem(STORAGE_KEY);
     }
 
-    // ---------------------------------------------------------------
-    // Cálculo de la evolución entre el punto de control y el estado actual
-    // ---------------------------------------------------------------
     function computeEvolution(checkpoint, current) {
         const rows = [];
         const joined = [];
@@ -130,11 +111,9 @@
                     name: now.name,
                     position: now.position,
                     pointsNow: Math.floor(now.points),
-                    delta: null, // sin comparación (miembro nuevo o sin punto de control)
+                    delta: null,
                 });
             } else {
-                // '|| 0' normaliza -0 a 0: Math.round(-0.3) da -0, que en
-                // texto saldría como "-0" en vez de "0".
                 const delta = Math.round(now.points - before.points) || 0;
                 rows.push({
                     id,
@@ -150,7 +129,6 @@
             if (!current[id]) left.push(prevMembers[id].name);
         });
 
-        // Nuevos miembros y sin comparación van al final; el resto ordenado por delta desc.
         rows.sort((a, b) => {
             if (a.delta === null && b.delta === null) return b.pointsNow - a.pointsNow;
             if (a.delta === null) return 1;
@@ -161,14 +139,9 @@
         return { rows, joined, left };
     }
 
-    // ---------------------------------------------------------------
-    // Generación del Markdown para Discord, troceado a ~1900 caracteres
-    // ---------------------------------------------------------------
     function padRight(str, len) {
         str = String(str);
         if (str.length >= len) {
-            // Aunque se trunque, dejamos siempre al menos un espacio de
-            // separación para que nunca se pegue con la columna siguiente.
             return str.slice(0, Math.max(len - 1, 1)) + ' ';
         }
         return str + ' '.repeat(len - str.length);
@@ -185,13 +158,10 @@
             padRight('Miembro', NAME_W) + padRight('Posición', POS_W) +
             padRight('Puntos', PTS_W) + 'Δ';
 
-        // Colores ANSI que Discord renderiza dentro de un bloque ```ansi.
-        // Van SOLO en la última columna (Δ) porque no lleva padding detrás,
-        // así los códigos invisibles no descuadran el resto de columnas.
-        const ANSI_RESET = '\u001b[0m';
-        const ANSI_GREEN = '\u001b[0;32m';
-        const ANSI_RED = '\u001b[0;31m';
-        const ANSI_YELLOW = '\u001b[0;33m';
+        const ANSI_RESET = '[0m';
+        const ANSI_GREEN = '[0;32m';
+        const ANSI_RED = '[0;31m';
+        const ANSI_YELLOW = '[0;33m';
 
         const tableLines = evolution.rows.map((r) => {
             const pointsStr = r.pointsNow.toLocaleString('es-ES');
@@ -203,8 +173,6 @@
             } else if (r.delta < 0) {
                 deltaStr = `${ANSI_RED}${r.delta.toLocaleString('es-ES')}${ANSI_RESET}`;
             } else {
-                // Delta 0: sin color (el color de texto por defecto del bloque),
-                // en vez de gris/negro que en tema oscuro queda invisible.
                 deltaStr = '0';
             }
             return padRight(r.name, NAME_W) + padRight(r.position, POS_W) +
@@ -212,8 +180,6 @@
         });
 
         let extra = '';
-        // Destacados con emoji (fuera del bloque de código, se ven como
-        // texto normal de Discord): mayor subida y mayor bajada.
         const numericRows = evolution.rows.filter((r) => r.delta !== null);
         if (numericRows.length > 0) {
             const top = numericRows[0];
@@ -232,10 +198,9 @@
             extra += `\n❌ Han abandonado: ${evolution.left.join(', ')}`;
         }
 
-        // Construimos el bloque completo y lo troceamos si hace falta
         const blocks = [];
         let currentLines = [tableHeader];
-        let currentLen = header.length + tableHeader.length + 10; // margen para fences
+        let currentLen = header.length + tableHeader.length + 10;
 
         tableLines.forEach((line) => {
             if (currentLen + line.length + 1 > DISCORD_CHUNK_LIMIT) {
@@ -257,15 +222,10 @@
         });
     }
 
-    // ---------------------------------------------------------------
-    // Inserta (o refresca) una columna Δ directamente en la tabla real
-    // del juego (#memberList), no solo en el texto para Discord.
-    // ---------------------------------------------------------------
     function injectDeltaColumn(deltaById) {
         const headerRow = document.querySelector('#memberList thead tr');
         if (!headerRow) return;
 
-        // Quita la columna de una posible generación anterior, para no duplicarla.
         document.querySelectorAll('#memberList .astro-delta-col').forEach((el) => el.remove());
 
         const th = document.createElement('th');
@@ -304,9 +264,6 @@
         document.querySelectorAll('#memberList .astro-delta-col').forEach((el) => el.remove());
     }
 
-    // ---------------------------------------------------------------
-    // UI
-    // ---------------------------------------------------------------
     function buildPanel() {
         const panel = document.createElement('div');
         panel.id = 'allianceStatsPanel';
@@ -367,16 +324,11 @@
             wrapper.appendChild(copyBtn);
             container.appendChild(wrapper);
 
-            // Alto automático según el contenido, con un tope razonable;
-            // por encima de ese tope sí aparece scroll real (overflow-y:auto).
             const MAX_HEIGHT = 480;
             textarea.style.height = Math.min(textarea.scrollHeight + 4, MAX_HEIGHT) + 'px';
         });
     }
 
-    // "Generar informe": SOLO lee y compara. Nunca modifica el punto de
-    // control, así que se puede pulsar tantas veces como se quiera sin
-    // perder la referencia original.
     function generateReport(panel) {
         const resultBox = panel.querySelector('#allianceStatsResult');
 
@@ -402,8 +354,6 @@
         }
     }
 
-    // "Nuevo punto de control": la ÚNICA acción que sobrescribe el
-    // punto de control guardado, fijando el estado actual como referencia.
     function resetCheckpoint(panel) {
         const currentMembers = parseMemberList();
         if (Object.keys(currentMembers).length === 0) {

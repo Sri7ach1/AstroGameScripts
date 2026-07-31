@@ -12,9 +12,6 @@
 (function () {
     'use strict';
 
-    // Obtiene los planetas de la cuenta directamente del panel lateral del juego.
-    // Las lunas no aparecen como .planetItem propio (van anidadas como .planetMoonBox
-    // dentro del planeta), así que quedan excluidas automáticamente.
     function getAccountPlanets() {
         const items = document.querySelectorAll('.planetList form button.planetItem[data-id]');
         return Array.from(items).map((btn) => ({
@@ -23,7 +20,6 @@
         }));
     }
 
-    // Filas de producción a sumar, en el orden en que aparecen en la tabla del juego
     const PERIODS = [
         { label: 'Producción en una hora', key: 'hour' },
         { label: 'Por dia:', key: 'day' },
@@ -31,12 +27,8 @@
         { label: 'Producción en un mes:', key: 'month' },
     ];
 
-    // La Energía no se incluye: es un balance instantáneo (no se acumula
-    // con el tiempo como Metal/Cristal/Deuterio), por eso el juego repite
-    // el mismo valor en hora/día/semana/mes.
     const METRICS = ['metal', 'cristal', 'deuterio'];
 
-    // Abreviaturas oficiales de Astrogame (según FAQ)
     const SUFFIXES = [
         '', 'K', 'M', 'Mr', 'T', 'KaT', 'KeT', 'Ss', 'St', 'O', 'N', 'D', 'U',
         'DoS', 'TrD', 'KaD', 'KeD', 'SxD', 'SpD', 'OD', 'ND', 'V', 'UV', 'DV',
@@ -57,8 +49,6 @@
         return value.toFixed(decimals).replace('.', ',') + '\u00A0' + SUFFIXES[exp];
     }
 
-    // Extrae el número completo de una celda de la tabla de producción
-    // (el número real está en el span .tooltip.topCenter, ya sin puntos de miles)
     function parseCell(td) {
         const tooltip = td.querySelector('.tooltip.topCenter');
         if (!tooltip) return 0;
@@ -85,7 +75,6 @@
             const period = PERIODS.find((p) => label && label.startsWith(p.label.split(' ')[0]) && label === p.label);
             if (!period) return;
             const cells = row.querySelectorAll('td');
-            // cells[0] = etiqueta, cells[1..3] = metal/cristal/deuterio (se ignora cells[4]=energía y cells[5]=vacío)
             METRICS.forEach((metric, i) => {
                 result[period.key][metric] = parseCell(cells[i + 1]);
             });

@@ -16,7 +16,6 @@
     const STORAGE_KEY = 'astro_expedition_history_v1';
     const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-    // Abreviaturas oficiales de Astrogame (según FAQ)
     const SUFFIXES = [
         '', 'K', 'M', 'Mr', 'T', 'KaT', 'KeT', 'Ss', 'St', 'O', 'N', 'D', 'U',
         'DoS', 'TrD', 'KaD', 'KeD', 'SxD', 'SpD', 'OD', 'ND', 'V', 'UV', 'DV',
@@ -36,24 +35,17 @@
         if (exp <= 0) return sign + formatFull(abs);
         const value = abs / Math.pow(1000, exp);
         const decimals = value < 10 ? 1 : 0;
-        return sign + value.toFixed(decimals).replace('.', ',') + '\u00A0' + SUFFIXES[exp];
+        return sign + value.toFixed(decimals).replace('.', ',') + ' ' + SUFFIXES[exp];
     }
 
-    // Parsea el formato de fecha propio del juego: "31. Jul 2026, 12:50:48"
     const MONTHS = { Ene: 0, Feb: 1, Mar: 2, Abr: 3, May: 4, Jun: 5, Jul: 6, Ago: 7, Sep: 8, Oct: 9, Nov: 10, Dic: 11 };
 
-    // El propio juego expone `serverTime` como variable global de página
-    // (declarada en el <head>, y se auto-incrementa un segundo cada segundo).
-    // La usamos como "ahora" en vez de Date.now() para que el corte de "hoy"
-    // sea la medianoche del SERVIDOR y no la del reloj/zona horaria del navegador,
-    // y para que sea coherente con las fechas de los propios mensajes (que también
-    // vienen del servidor y se parsean con el mismo criterio).
     function getServerNow() {
         const st = window.serverTime;
         if (st instanceof Date && !isNaN(st.getTime())) {
             return st.getTime();
         }
-        return Date.now(); // fallback por si la variable no existiera
+        return Date.now();
     }
 
     function parseGameDate(str) {
@@ -64,11 +56,6 @@
         return new Date(Number(year), month, Number(day), Number(hh), Number(mm), Number(ss)).getTime();
     }
 
-    // ---------------------------------------------------------------
-    // Patrones conocidos de texto de mensajes de expedición.
-    // Si un mensaje no encaja con ninguno, se guarda como "no reconocido"
-    // (con su texto) para poder revisarlo y ampliar el patrón después.
-    // ---------------------------------------------------------------
     const NUM = '([\\d.]+)';
 
     const PATTERNS = [
@@ -82,8 +69,6 @@
                 materiaOscura: toNumber(m[4]),
             }),
         },
-        // Mensajes narrativos sin ninguna cifra: no aportan nada a la suma,
-        // pero se reconocen igualmente para no aparecer como "no reconocidos".
         {
             name: 'expedicion_vacia',
             regex: /volvemos con las manos vac[ií]as/i,
@@ -100,10 +85,6 @@
             extract: () => emptyTotals(),
         },
         {
-            // Combate contra piratas/aliens durante la expedición: el HTML trae
-            // un informe de batalla con una sección "Beneficios" (botín ganado).
-            // Las pérdidas de naves (Atacante/Defensor) no se registran aquí
-            // todavía — solo el botín en recursos, igual que el resto de patrones.
             name: 'expedicion_combate_botin',
             regex: new RegExp(`Beneficios\\s*Metal:\\s*${NUM}\\s*Cristal:\\s*${NUM}\\s*Deut[ée]rio:\\s*${NUM}`, 'i'),
             extract: (m) => ({
@@ -134,8 +115,6 @@
             extract: () => emptyTotals(),
         },
         {
-            // Flota perdida por completo (reacción en cadena) — sin cifra
-            // de naves en el propio texto; el conteo de flota queda pendiente.
             name: 'expedicion_flota_perdida_reaccion',
             regex: /reacci[oó]n en cadena que explot[oó]/i,
             extract: () => emptyTotals(),
@@ -161,10 +140,6 @@
             extract: () => emptyTotals(),
         },
         {
-            // Naves encontradas en una expedición anterior (ej. "Nave pequeña
-            // de carga: 6"). El conteo de naves ganadas/perdidas queda
-            // pendiente como ampliación aparte — de momento solo se reconoce
-            // para no aparecer como "no reconocido", sin sumar las naves.
             name: 'expedicion_naves_encontradas',
             regex: /restos de una expedici[oó]n anterior[\s\S]*/i,
             extract: (m) => extractShipsFound(m[0]),
@@ -180,8 +155,6 @@
             extract: () => emptyTotals(),
         },
         {
-            // Narrativo sin cifras: los recursos de este tipo de encuentro llegan
-            // en el mensaje "Retorno de la flota" aparte, no aquí.
             name: 'expedicion_convoy_naves_civiles',
             regex: /convoy de naves civiles/i,
             extract: () => emptyTotals(),
@@ -197,8 +170,6 @@
             extract: () => emptyTotals(),
         },
         {
-            // Flota perdida por completo (fallo del salto al espacio normal) —
-            // distinto de expedicion_flota_perdida_reaccion (reacción en cadena).
             name: 'expedicion_salto_fallido_perdida',
             regex: /no pudo dar el salto hacia el espacio normal/i,
             extract: () => emptyTotals(),
@@ -209,44 +180,31 @@
             extract: () => emptyTotals(),
         },
         {
-            // Narrativo sin cifras: el texto no da un número de Materia Oscura,
-            // solo "un recipiente" - sin cantidad concreta que sumar.
             name: 'expedicion_alien_materia_oscura',
             regex: /alien a bordo de una peque[ñn]a nave/i,
             extract: () => emptyTotals(),
         },
         {
-            // Narrativo sin cifras: los recursos obtenidos por las naves no
-            // tripuladas llegan en el mensaje "Retorno de la flota" aparte.
             name: 'expedicion_contaminacion_radioactiva',
             regex: /contaminaci[oó]n radioactiva/i,
             extract: () => emptyTotals(),
         },
         {
-            // Error del módulo de navegación: deuterio agotado y salto
-            // terminado en una luna en vez del destino previsto - sin cifras.
             name: 'expedicion_navegacion_salto_luna',
             regex: /termin[oó] el salto justo en una luna/i,
             extract: () => emptyTotals(),
         },
         {
-            // Narrativo sin cifras: las materias primas encontradas llegan
-            // en el mensaje "Retorno de la flota" aparte, no aquí.
             name: 'expedicion_planetoide_materias_primas',
             regex: /planetoide remoto de f[aá]cil acceso/i,
             extract: () => emptyTotals(),
         },
         {
-            // Narrativo sin cifras de recursos: el botín llega en el mensaje
-            // "Retorno de la flota" aparte, no aquí.
             name: 'expedicion_asteroides_recursos',
             regex: /peque[ñn]o grupo de asteroides/i,
             extract: () => emptyTotals(),
         },
         {
-            // Naves encontradas en una vieja estrella de la muerte (ej. "Nave
-            // pequeña de carga: 6") — mismo caso que expedicion_naves_encontradas
-            // pero con otro texto de entrada.
             name: 'expedicion_estrella_muerte_naves',
             regex: /vieja estrella de la muerte[\s\S]*/i,
             extract: (m) => extractShipsFound(m[0]),
@@ -258,10 +216,6 @@
         return isNaN(value) ? 0 : value;
     }
 
-    // Busca líneas tipo "Nave pequeña de carga: 6" en el texto de un mensaje
-    // de naves encontradas. El conteo de naves ganadas/perdidas en el resto
-    // del histórico queda pendiente como ampliación aparte — de momento solo
-    // se reconoce el mensaje para no aparecer como "no reconocido".
     function extractShipsFound(text) {
         const ships = {};
         const shipLineRegex = /([A-Za-zÁÉÍÓÚÑÜáéíóúñü][A-Za-zÁÉÍÓÚÑÜáéíóúñü\s]+?):\s*([\d.]+)/g;
@@ -295,9 +249,6 @@
         return { recognized: false, rawText: plain.trim() };
     }
 
-    // ---------------------------------------------------------------
-    // Almacenamiento en localStorage
-    // ---------------------------------------------------------------
     function loadStore() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -359,16 +310,9 @@
         return messages;
     }
 
-    // Reintenta los patrones ACTUALES contra mensajes que quedaron guardados
-    // como "no reconocidos" en una versión anterior del script (antes de
-    // añadir un patrón nuevo). Usa el texto ya guardado, sin volver a pedirlo.
     function reparseUnrecognized(store) {
         Object.values(store.messages).forEach((entry) => {
             if (entry.recognized || !entry.rawText) return;
-            // El rawText pudo guardarse con una versión anterior del script,
-            // antes de limpiar &nbsp; y colapsar espacios — se normaliza aquí
-            // también para que los reintentos funcionen sobre texto guardado
-            // desde antes de esa corrección, sin tener que volver a descargarlo.
             const normalized = entry.rawText.replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
             for (const pattern of PATTERNS) {
                 const match = normalized.match(pattern.regex);
@@ -382,15 +326,12 @@
         });
     }
 
-    // Descarga los mensajes actuales, añade al histórico los que sean
-    // nuevos (por id, sin duplicar los ya guardados), purga lo > 7 días
-    // y persiste. Devuelve el store actualizado.
     async function updateHistory() {
         const store = loadStore();
         const messages = await fetchAllExpeditionMessages();
 
         messages.forEach((msg) => {
-            if (store.messages[msg.id]) return; // ya guardado, no se toca
+            if (store.messages[msg.id]) return;
             const parsed = parseMessageText(msg.text);
             store.messages[msg.id] = {
                 timestamp: parseGameDate(msg.time),
@@ -435,7 +376,7 @@
         }
 
         Object.entries(store.messages).forEach(([id, entry]) => {
-            if (entry.timestamp < weekCutoff) return; // fuera del histórico de 7 días
+            if (entry.timestamp < weekCutoff) return;
             countWeek++;
             const isToday = entry.timestamp >= todayCutoff;
             if (isToday) countToday++;
@@ -465,9 +406,6 @@
         };
     }
 
-    // ---------------------------------------------------------------
-    // UI
-    // ---------------------------------------------------------------
     function buildPanel() {
         const panel = document.createElement('div');
         panel.id = 'expeditionCalcPanel';
@@ -513,7 +451,6 @@
             console.warn('[AstroExpeditionCal] Mensajes no reconocidos:', summary.unrecognized);
         }
 
-        // Tabla de naves encontradas (Hoy / Últimos 7 días), solo si hay alguna.
         const shipNames = Array.from(new Set([
             ...Object.keys(summary.totalsToday.shipsGained || {}),
             ...Object.keys(summary.totalsWeek.shipsGained || {}),
@@ -592,7 +529,7 @@
     }
 
     function init() {
-        if (document.getElementById('expeditionCalcPanel')) return; // ya insertado, evita duplicados
+        if (document.getElementById('expeditionCalcPanel')) return;
 
         const header = document.querySelector('.pageMessagesDefault .pageHeader');
         if (!header) return;
@@ -600,15 +537,10 @@
         const panel = buildPanel();
         header.insertAdjacentElement('afterend', panel);
 
-        // Muestra de entrada lo que ya hay guardado (sin red), para que
-        // el panel no aparezca vacío mientras decides si actualizar.
         renderFromCacheOnly(panel);
 
         panel.querySelector('#expeditionCalcBtn').addEventListener('click', () => refresh(panel));
 
-        // Autoactualiza cuando entras específicamente en la pestaña de
-        // "Informes de expediciones" (categoría 15), tanto si haces clic
-        // tú como si la página la abre sola vía el parámetro ?mode=15.
         const expeditionTab = document.querySelector('button.messageCategory[data-id="15"]');
         if (expeditionTab) {
             expeditionTab.addEventListener('click', () => refresh(panel));

@@ -31,9 +31,6 @@
         return sign + value.toFixed(decimals).replace('.', ',') + ' ' + SUFFIXES[exp];
     }
 
-    // Extrae un literal de objeto JS balanceando llaves (respetando comillas/escapes),
-    // porque el HTML embebe buildingData/researchData/resourceTable como JS suelto,
-    // no como JSON aislado, y un regex simple se rompe con objetos anidados.
     function extractObjectLiteral(text, marker) {
         const idx = text.indexOf(marker);
         if (idx === -1) return null;
@@ -67,13 +64,6 @@
         }
     }
 
-    // Lee buildingData/researchData/resourceTable directo de los <script> inline
-    // que el propio servidor ya insertó en el documento actual, en vez de re-fetchear
-    // la página: el juego registra un Service Worker (sw.js) que puede interceptar
-    // ese fetch y devolver una versión cacheada/parcial sin esos datos. Los <script>
-    // inline conservan su textContent original aunque el userscript corra en un
-    // mundo aislado (grant: none no garantiza compartir el scope léxico let/const
-    // de la página), así que leer el DOM es más fiable que re-descargar.
     function findInInlineScripts(marker) {
         const scripts = document.querySelectorAll('script:not([src])');
         for (const script of scripts) {
@@ -86,11 +76,6 @@
         return null;
     }
 
-    // La variable JS `resourceTable` solo viene embebida en las páginas de
-    // Recursos/Instalaciones, NO en la de Investigación. En cambio los tooltips de
-    // recursos del header (compartido en todas las páginas) sí traen la producción
-    // actual en el atributo data-production, así que la leemos de ahí siempre -
-    // funciona igual en las dos páginas sin depender de qué variable JS exista.
     function getResourceProductionFromDom() {
         const table = {};
         document.querySelectorAll('.resourceCardTooltip[data-id]').forEach((el) => {
@@ -111,8 +96,6 @@
         };
     }
 
-    // Tasa de cambio del mercader de este servidor: 4 Metal = 2 Cristal = 1 Deutério.
-    // En "valor-metal": Metal x1, Cristal x2, Deutério x4.
     const VALUE_WEIGHTS = { '901': 1, '902': 2, '903': 4 };
 
     function weightedValue(costResources) {
@@ -120,13 +103,6 @@
         return ['901', '902', '903'].reduce((sum, key) => sum + (Number(costResources[key]) || 0) * VALUE_WEIGHTS[key], 0);
     }
 
-    // Fórmula estándar de minas OGame: producción(nivel) = C * nivel * 1.1^nivel * k,
-    // donde C (base por tipo de recurso) y k (velocidad de servidor, temperatura del
-    // planeta, bonos de oficiales/investigación) son constantes multiplicativas
-    // independientes del nivel. Al tomar el ratio producción(objetivo)/producción(actual)
-    // esas constantes se cancelan por completo, así que no hace falta conocerlas ni
-    // saber la velocidad real del servidor - el cálculo se recalibra solo con la
-    // producción actual que ya trae la página.
     function mineProductionRatio(currentLevel, targetLevel) {
         return (targetLevel / currentLevel) * Math.pow(1.1, targetLevel - currentLevel);
     }
@@ -136,9 +112,6 @@
         if (!b || !b.buyable) return null;
         const currentLevel = Number(b.level);
         if (!currentLevel) return null;
-        // El botón de mejora rápida siempre sube exactamente 1 nivel; levelToBuild
-        // en esta página viene igual al nivel actual (no es "próximo nivel" como en
-        // Investigación), así que no sirve para esto y se ignora.
         const targetLevel = currentLevel + 1;
         const currentProduction = resourceTable[resKey]?.production;
         if (!currentProduction) return null;
@@ -155,11 +128,6 @@
         };
     }
 
-    // Las investigaciones de producción (131/132/133) dan un bono ADITIVO plano de
-    // +10% por nivel sobre la producción base (igual que un bono de oficial): el
-    // factor total es (1 + 0.10*nivel). Se despeja la producción base a partir de la
-    // producción actual (que ya incluye el bono del nivel actual) y se reaplica con
-    // el factor del nivel objetivo.
     function computeTechROI(researchData, resourceTable, techId, resKey, label) {
         const r = researchData[techId];
         if (!r || !r.buyable) return null;
@@ -269,7 +237,7 @@
     }
 
     function init() {
-        if (document.getElementById('astroRoiPanel')) return; // ya insertado, evita duplicados
+        if (document.getElementById('astroRoiPanel')) return;
 
         const header = document.querySelector('.pageHeader');
         if (!header) return;

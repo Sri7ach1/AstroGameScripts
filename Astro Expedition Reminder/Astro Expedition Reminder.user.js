@@ -15,26 +15,19 @@
     const MISSION_EXPEDITION = '15';
     const REMINDER_ID = 'astroExpeditionReminder';
 
-    // `activeFleetActs` es una variable global que la propia página declara
-    // inline en el <head> con `const` — por eso NO cuelga de `window.` (a
-    // diferencia de `var`), pero sí es accesible como identificador directo
-    // desde cualquier otro script que comparta el documento (como este,
-    // gracias a @grant none). Referenciarla vía `window.activeFleetActs`
-    // siempre da `undefined` aunque la variable exista.
     function getOwnExpeditionsInFlight() {
         let acts;
         try {
-            // eslint-disable-next-line no-undef
             acts = activeFleetActs;
         } catch (e) {
-            return null; // no declarada en esta página en absoluto
+            return null;
         }
         if (!Array.isArray(acts)) return null;
         return acts.filter((a) => a.mission === MISSION_EXPEDITION && a.is_own === true);
     }
 
     function showReminder() {
-        if (document.getElementById(REMINDER_ID)) return; // ya está mostrado
+        if (document.getElementById(REMINDER_ID)) return;
 
         const banner = document.createElement('div');
         banner.id = REMINDER_ID;
@@ -66,7 +59,7 @@
 
     function init() {
         const ownExpeditions = getOwnExpeditionsInFlight();
-        if (ownExpeditions === null) return; // variable no disponible en esta página
+        if (ownExpeditions === null) return;
         if (ownExpeditions.length === 0) {
             showReminder();
         }
