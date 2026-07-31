@@ -242,6 +242,13 @@
             regex: /termin[oó] el salto justo en una luna/i,
             extract: () => emptyTotals(),
         },
+        {
+            // Narrativo sin cifras: las materias primas encontradas llegan
+            // en el mensaje "Retorno de la flota" aparte, no aquí.
+            name: 'expedicion_planetoide_materias_primas',
+            regex: /planetoide remoto de f[aá]cil acceso/i,
+            extract: () => emptyTotals(),
+        },
     ];
 
     function toNumber(raw) {
