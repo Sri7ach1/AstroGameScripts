@@ -40,7 +40,20 @@
 
     const MONTHS = { Ene: 0, Feb: 1, Mar: 2, Abr: 3, May: 4, Jun: 5, Jul: 6, Ago: 7, Sep: 8, Oct: 9, Nov: 10, Dic: 11 };
 
+    function getServerNowFromDom() {
+        const el = document.querySelector('.servertimeTop');
+        if (!el) return null;
+        const m = el.textContent.match(/(\d{2})\.(\d{2})\.(\d{2,4})\s+(\d{2}):(\d{2}):(\d{2})/);
+        if (!m) return null;
+        const [, dd, mm, yy, hh, min, ss] = m;
+        const year = yy.length === 2 ? 2000 + Number(yy) : Number(yy);
+        const date = new Date(year, Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
+        return isNaN(date.getTime()) ? null : date.getTime();
+    }
+
     function getServerNow() {
+        const fromDom = getServerNowFromDom();
+        if (fromDom !== null) return fromDom;
         const st = window.serverTime;
         if (st instanceof Date && !isNaN(st.getTime())) {
             return st.getTime();
@@ -208,6 +221,16 @@
             name: 'expedicion_estrella_muerte_naves',
             regex: /vieja estrella de la muerte[\s\S]*/i,
             extract: (m) => extractShipsFound(m[0]),
+        },
+        {
+            name: 'expedicion_cementerio_naves',
+            regex: /cementerio gigante de naves espaciales[\s\S]*/i,
+            extract: (m) => extractShipsFound(m[0]),
+        },
+        {
+            name: 'expedicion_nave_alienigena_contenedor',
+            regex: /restos de una nave alien[ií]gena/i,
+            extract: () => emptyTotals(),
         },
     ];
 
