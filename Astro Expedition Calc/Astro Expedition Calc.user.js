@@ -266,10 +266,39 @@
         for (const pattern of PATTERNS) {
             const match = plain.match(pattern.regex);
             if (match) {
-                return { recognized: true, deltas: pattern.extract(match) };
+                return { recognized: true, deltas: pattern.extract(match), patternName: pattern.name };
             }
         }
         return { recognized: false, rawText: plain.trim() };
+    }
+
+    function extractRaportId(rawText) {
+        const m = String(rawText).match(/raport=([a-f0-9]+)/i);
+        return m ? m[1] : null;
+    }
+
+    async function fetchShipsLostFromReport(raportId) {
+        try {
+            const res = await fetch(`https://play.astrogame.org/uni25/game/combatReport?raport=${raportId}`, {
+                credentials: 'include',
+            });
+            if (!res.ok) return {};
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const sections = doc.querySelectorAll('.round-units-attacker');
+            const lastSection = sections[sections.length - 1];
+            if (!lastSection) return {};
+            const losses = {};
+            lastSection.querySelectorAll('.ships').forEach((shipEl) => {
+                const name = shipEl.querySelector('.name')?.textContent.trim();
+                const lost = toNumber(shipEl.querySelector('.count2')?.getAttribute('title') || '0');
+                if (name && lost > 0) losses[name] = (losses[name] || 0) + lost;
+            });
+            return losses;
+        } catch (e) {
+            console.error('[AstroExpeditionCal] Error obteniendo pérdidas del reporte', raportId, e);
+            return {};
+        }
     }
 
     function loadStore() {
@@ -353,17 +382,24 @@
         const store = loadStore();
         const messages = await fetchAllExpeditionMessages();
 
-        messages.forEach((msg) => {
-            if (store.messages[msg.id]) return;
+        for (const msg of messages) {
+            if (store.messages[msg.id]) continue;
             const parsed = parseMessageText(msg.text);
-            store.messages[msg.id] = {
+            const entry = {
                 timestamp: parseGameDate(msg.time),
                 time: msg.time,
                 recognized: parsed.recognized,
                 deltas: parsed.recognized ? parsed.deltas : null,
                 rawText: parsed.recognized ? null : parsed.rawText,
             };
-        });
+            if (parsed.recognized && parsed.patternName === 'expedicion_combate_botin') {
+                const raportId = extractRaportId(msg.text);
+                if (raportId) {
+                    entry.deltas.shipsLost = await fetchShipsLostFromReport(raportId);
+                }
+            }
+            store.messages[msg.id] = entry;
+        }
 
         reparseUnrecognized(store);
         store.lastUpdated = getServerNow();
@@ -384,8 +420,10 @@
 
         const totalsToday = emptyTotals();
         totalsToday.shipsGained = {};
+        totalsToday.shipsLost = {};
         const totalsWeek = emptyTotals();
         totalsWeek.shipsGained = {};
+        totalsWeek.shipsLost = {};
         let countWeek = 0;
         let countToday = 0;
         let recognizedWeek = 0;
@@ -408,9 +446,9 @@
                 recognizedWeek++;
                 if (isToday) recognizedToday++;
                 Object.keys(entry.deltas).forEach((key) => {
-                    if (key === 'shipsGained') {
-                        mergeShips(totalsWeek.shipsGained, entry.deltas.shipsGained);
-                        if (isToday) mergeShips(totalsToday.shipsGained, entry.deltas.shipsGained);
+                    if (key === 'shipsGained' || key === 'shipsLost') {
+                        mergeShips(totalsWeek[key], entry.deltas[key]);
+                        if (isToday) mergeShips(totalsToday[key], entry.deltas[key]);
                         return;
                     }
                     totalsWeek[key] += entry.deltas[key];
@@ -501,6 +539,33 @@
             `;
         }
 
+        const lostNames = Array.from(new Set([
+            ...Object.keys(summary.totalsToday.shipsLost || {}),
+            ...Object.keys(summary.totalsWeek.shipsLost || {}),
+        ]));
+        let lostTable = '';
+        if (lostNames.length > 0) {
+            const lostRows = lostNames.map((name) => `
+                <tr>
+                    <td style="padding:4px 10px;">${name}</td>
+                    <td style="padding:4px 10px;">${summary.totalsToday.shipsLost[name] || 0}</td>
+                    <td style="padding:4px 10px;">${summary.totalsWeek.shipsLost[name] || 0}</td>
+                </tr>
+            `).join('');
+            lostTable = `
+                <table class="resourcesTable" style="width:100%;margin-top:10px;">
+                    <tbody>
+                        <tr class="tableHeader">
+                            <td style="padding:4px 10px;">Naves perdidas</td>
+                            <td style="padding:4px 10px;">Hoy</td>
+                            <td style="padding:4px 10px;">Últimos 7 días</td>
+                        </tr>
+                        ${lostRows}
+                    </tbody>
+                </table>
+            `;
+        }
+
         const lastUpdatedStr = store.lastUpdated
             ? new Date(store.lastUpdated).toLocaleString('es-ES')
             : '—';
@@ -517,6 +582,7 @@
                 </tbody>
             </table>
             ${shipsTable}
+            ${lostTable}
             ${warning}
             <div style="margin-top:6px;font-size:11px;opacity:0.7;">Última actualización: ${lastUpdatedStr}</div>
         `;
