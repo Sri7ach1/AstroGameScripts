@@ -235,6 +235,13 @@
             regex: /contaminaci[oó]n radioactiva/i,
             extract: () => emptyTotals(),
         },
+        {
+            // Error del módulo de navegación: deuterio agotado y salto
+            // terminado en una luna en vez del destino previsto - sin cifras.
+            name: 'expedicion_navegacion_salto_luna',
+            regex: /termin[oó] el salto justo en una luna/i,
+            extract: () => emptyTotals(),
+        },
     ];
 
     function toNumber(raw) {
