@@ -167,20 +167,7 @@
             // para no aparecer como "no reconocido", sin sumar las naves.
             name: 'expedicion_naves_encontradas',
             regex: /restos de una expedici[oó]n anterior[\s\S]*/i,
-            extract: (m) => {
-                const ships = {};
-                // Busca líneas tipo "Nave pequeña de carga: 6" en el resto del texto.
-                const shipLineRegex = /([A-Za-zÁÉÍÓÚÑÜáéíóúñü][A-Za-zÁÉÍÓÚÑÜáéíóúñü\s]+?):\s*([\d.]+)/g;
-                let sm;
-                while ((sm = shipLineRegex.exec(m[0])) !== null) {
-                    const name = sm[1].trim();
-                    const qty = toNumber(sm[2]);
-                    if (qty > 0) ships[name] = (ships[name] || 0) + qty;
-                }
-                const totals = emptyTotals();
-                totals.shipsGained = ships;
-                return totals;
-            },
+            extract: (m) => extractShipsFound(m[0]),
         },
         {
             name: 'expedicion_materia_oscura_captada',
@@ -249,11 +236,44 @@
             regex: /planetoide remoto de f[aá]cil acceso/i,
             extract: () => emptyTotals(),
         },
+        {
+            // Narrativo sin cifras de recursos: el botín llega en el mensaje
+            // "Retorno de la flota" aparte, no aquí.
+            name: 'expedicion_asteroides_recursos',
+            regex: /peque[ñn]o grupo de asteroides/i,
+            extract: () => emptyTotals(),
+        },
+        {
+            // Naves encontradas en una vieja estrella de la muerte (ej. "Nave
+            // pequeña de carga: 6") — mismo caso que expedicion_naves_encontradas
+            // pero con otro texto de entrada.
+            name: 'expedicion_estrella_muerte_naves',
+            regex: /vieja estrella de la muerte[\s\S]*/i,
+            extract: (m) => extractShipsFound(m[0]),
+        },
     ];
 
     function toNumber(raw) {
         const value = parseInt(String(raw).replace(/\./g, ''), 10);
         return isNaN(value) ? 0 : value;
+    }
+
+    // Busca líneas tipo "Nave pequeña de carga: 6" en el texto de un mensaje
+    // de naves encontradas. El conteo de naves ganadas/perdidas en el resto
+    // del histórico queda pendiente como ampliación aparte — de momento solo
+    // se reconoce el mensaje para no aparecer como "no reconocido".
+    function extractShipsFound(text) {
+        const ships = {};
+        const shipLineRegex = /([A-Za-zÁÉÍÓÚÑÜáéíóúñü][A-Za-zÁÉÍÓÚÑÜáéíóúñü\s]+?):\s*([\d.]+)/g;
+        let sm;
+        while ((sm = shipLineRegex.exec(text)) !== null) {
+            const name = sm[1].trim();
+            const qty = toNumber(sm[2]);
+            if (qty > 0) ships[name] = (ships[name] || 0) + qty;
+        }
+        const totals = emptyTotals();
+        totals.shipsGained = ships;
+        return totals;
     }
 
     function emptyTotals() {
