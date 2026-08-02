@@ -2,8 +2,9 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Reminder
 // @namespace    astrogame-tools
-// @version      1.0
+// @version      1.1
 // @description  Muestra un aviso flotante si no tienes ninguna expedición en el aire ahora mismo
+// @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js
 // @match        https://play.astrogame.org/uni25/game/*
 // @grant        none
 // @run-at       document-idle
@@ -14,6 +15,20 @@
 
     const MISSION_EXPEDITION = '15';
     const REMINDER_ID = 'astroExpeditionReminder';
+    const HIDDEN_KEY = 'astroExpeditionReminderHidden';
+    const NAV_BTN_ID = 'astroExpeditionReminderNavBtn';
+
+    function isHidden() {
+        return localStorage.getItem(HIDDEN_KEY) === '1';
+    }
+
+    function setHidden(value) {
+        if (value) {
+            localStorage.setItem(HIDDEN_KEY, '1');
+        } else {
+            localStorage.removeItem(HIDDEN_KEY);
+        }
+    }
 
     function getOwnExpeditionsInFlight() {
         let acts;
@@ -26,7 +41,14 @@
         return acts.filter((a) => a.mission === MISSION_EXPEDITION && a.is_own === true);
     }
 
+    function hideReminder() {
+        const banner = document.getElementById(REMINDER_ID);
+        if (banner) banner.remove();
+        setHidden(true);
+    }
+
     function showReminder() {
+        setHidden(false);
         if (document.getElementById(REMINDER_ID)) return;
 
         const banner = document.createElement('div');
@@ -54,13 +76,40 @@
         `;
         document.body.appendChild(banner);
 
-        banner.querySelector('#astroExpeditionReminderClose').addEventListener('click', () => banner.remove());
+        banner.querySelector('#astroExpeditionReminderClose').addEventListener('click', hideReminder);
+    }
+
+    function toggleReminder() {
+        if (document.getElementById(REMINDER_ID)) {
+            hideReminder();
+        } else {
+            showReminder();
+        }
+    }
+
+    function addNavItem() {
+        const chatLink = document.querySelector('.sidebarNavList a.chatNavItem');
+        if (!chatLink || document.getElementById(NAV_BTN_ID)) return;
+
+        const link = document.createElement('a');
+        link.id = NAV_BTN_ID;
+        link.className = 'navItem';
+        link.href = '#';
+        link.innerHTML = `<span>Expedition Reminder</span>`;
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleReminder();
+        });
+
+        chatLink.insertAdjacentElement('afterend', link);
     }
 
     function init() {
+        addNavItem();
+
         const ownExpeditions = getOwnExpeditionsInFlight();
         if (ownExpeditions === null) return;
-        if (ownExpeditions.length === 0) {
+        if (ownExpeditions.length === 0 && !isHidden()) {
             showReminder();
         }
     }
