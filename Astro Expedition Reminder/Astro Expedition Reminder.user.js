@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Reminder
 // @namespace    astrogame-tools
-// @version      1.2
+// @version      1.3
 // @description  Muestra un aviso flotante si no tienes ninguna expedición en el aire ahora mismo
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js

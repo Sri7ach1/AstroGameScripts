@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro ROI
 // @namespace    astrogame-tools
-// @version      1.1
+// @version      1.2
 // @description  Calcula cuántos días tardan en pagarse las mejoras de minas y de investigación de producción en Astrogame
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20ROI/Astro%20ROI.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20ROI/Astro%20ROI.user.js

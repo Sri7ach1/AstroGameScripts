@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Calc
 // @namespace    astrogame-tools
-// @version      1.4.2
+// @version      1.5
 // @description  Guarda y suma el histórico (7 días) de resultados de expediciones en Astrogame, aunque borres los mensajes
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js

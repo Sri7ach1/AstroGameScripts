@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Cereal Stats
 // @namespace    astrogame-tools
-// @version      1.1
+// @version      1.2
 // @description  Evolución de puntos de la alianza para Astrogame, en Markdown para Discord. Fork/inspirado en CerealOgameStats v4.0.1 de Elías Grande y Ouraios.
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Cereal%20Stats/Astro%20Cereal%20Stats.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Cereal%20Stats/Astro%20Cereal%20Stats.user.js

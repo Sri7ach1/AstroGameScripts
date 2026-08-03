@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Resource Calc
 // @namespace    astrogame-tools
-// @version      1.1
+// @version      1.2
 // @description  Muestra la producción total (hora/día/semana/mes) de todos tus planetas en la vista de recursos
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Resource%20Calc/Astro%20Resource%20Calc.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Resource%20Calc/Astro%20Resource%20Calc.user.js
