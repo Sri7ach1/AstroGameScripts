@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Calc
 // @namespace    astrogame-tools
-// @version      1.5
+// @version      1.6
 // @description  Guarda y suma el histórico (7 días) de resultados de expediciones en Astrogame, aunque borres los mensajes
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js
@@ -173,6 +173,11 @@
         {
             name: 'expedicion_naves_encontradas',
             regex: /restos de una expedici[oó]n anterior[\s\S]*/i,
+            extract: (m) => extractShipsFound(m[0]),
+        },
+        {
+            name: 'expedicion_base_pirata_naves',
+            regex: /base abandonada de piratas[\s\S]*/i,
             extract: (m) => extractShipsFound(m[0]),
         },
         {

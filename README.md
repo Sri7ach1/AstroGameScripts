@@ -14,6 +14,10 @@ Colección de userscripts (Tampermonkey/Violentmonkey) para [Astrogame](https://
 
 Cada carpeta tiene su propio `README.md` con el detalle de funcionamiento del script correspondiente.
 
+## En desarrollo
+
+- [AstroGame Suite](AstroGame%20Suite/README.md) — suite única que unifica los 5 scripts anteriores bajo una sola instalación (Fase 0 y 1 completadas: núcleo de settings/formato/UI + los 5 módulos migrados). Los scripts individuales se mantienen por ahora como referencia/fallback.
+
 ## Instalación
 
 1. Instala la extensión [Tampermonkey](https://www.tampermonkey.net/) (o [Violentmonkey](https://violentmonkey.github.io/)) en tu navegador.
