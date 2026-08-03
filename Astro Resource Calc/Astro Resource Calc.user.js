@@ -5,6 +5,8 @@
 // @version      1.1
 // @description  Muestra la producción total (hora/día/semana/mes) de todos tus planetas en la vista de recursos
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Resource%20Calc/Astro%20Resource%20Calc.user.js
+// @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Resource%20Calc/Astro%20Resource%20Calc.user.js
+// @downloadURL  https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Resource%20Calc/Astro%20Resource%20Calc.user.js
 // @match        https://play.astrogame.org/uni25/game/feedstock*
 // @grant        none
 // @run-at       document-idle

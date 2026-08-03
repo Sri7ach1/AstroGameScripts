@@ -5,6 +5,8 @@
 // @version      1.2
 // @description  Muestra un aviso flotante si no tienes ninguna expedición en el aire ahora mismo
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js
+// @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js
+// @downloadURL  https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js
 // @match        https://play.astrogame.org/uni25/game/*
 // @grant        none
 // @run-at       document-idle

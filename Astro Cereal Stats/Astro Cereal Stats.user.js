@@ -5,6 +5,8 @@
 // @version      1.1
 // @description  Evolución de puntos de la alianza para Astrogame, en Markdown para Discord. Fork/inspirado en CerealOgameStats v4.0.1 de Elías Grande y Ouraios.
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Cereal%20Stats/Astro%20Cereal%20Stats.user.js
+// @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Cereal%20Stats/Astro%20Cereal%20Stats.user.js
+// @downloadURL  https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Cereal%20Stats/Astro%20Cereal%20Stats.user.js
 // @match        https://play.astrogame.org/uni25/game/alliance/memberList*
 // @grant        none
 // @run-at       document-idle
