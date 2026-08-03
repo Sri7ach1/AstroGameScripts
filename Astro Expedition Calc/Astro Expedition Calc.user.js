@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Calc
 // @namespace    astrogame-tools
-// @version      1.1
+// @version      1.2
 // @description  Guarda y suma el histórico (7 días) de resultados de expediciones en Astrogame, aunque borres los mensajes
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js
 // @match        https://play.astrogame.org/uni25/game/messages*
@@ -36,7 +36,7 @@
         if (exp <= 0) return sign + formatFull(abs);
         const value = abs / Math.pow(1000, exp);
         const decimals = value < 10 ? 1 : 0;
-        return sign + value.toFixed(decimals).replace('.', ',') + ' ' + SUFFIXES[exp];
+        return sign + value.toFixed(decimals).replace('.', ',') + ' ' + SUFFIXES[exp];
     }
 
     const MONTHS = { Ene: 0, Feb: 1, Mar: 2, Abr: 3, May: 4, Jun: 5, Jul: 6, Ago: 7, Sep: 8, Oct: 9, Nov: 10, Dic: 11 };
@@ -121,6 +121,11 @@
         {
             name: 'expedicion_amistad_vacio',
             regex: /hizo amistad con el vac[ií]o del universo/i,
+            extract: () => emptyTotals(),
+        },
+        {
+            name: 'expedicion_yacimientos_minerales_luna',
+            regex: /grandes yacimientos minerales/i,
             extract: () => emptyTotals(),
         },
         {
