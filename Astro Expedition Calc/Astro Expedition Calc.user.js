@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Calc
 // @namespace    astrogame-tools
-// @version      1.2
+// @version      1.3
 // @description  Guarda y suma el histórico (7 días) de resultados de expediciones en Astrogame, aunque borres los mensajes
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js
 // @match        https://play.astrogame.org/uni25/game/messages*
@@ -169,6 +169,11 @@
             extract: () => emptyTotals(),
         },
         {
+            name: 'expedicion_nave_fantasma_materia_oscura',
+            regex: /nave fantasma que transportaba/i,
+            extract: () => emptyTotals(),
+        },
+        {
             name: 'expedicion_escasez_deuterio',
             regex: /escasez de deuterio/i,
             extract: () => emptyTotals(),
@@ -181,6 +186,11 @@
         {
             name: 'expedicion_salto_erroneo_retraso',
             regex: /el retorno llevar[aá] m[aá]s tiempo/i,
+            extract: () => emptyTotals(),
+        },
+        {
+            name: 'expedicion_tormenta_particulas_retraso',
+            regex: /tormentas de part[ií]culas amplificadas/i,
             extract: () => emptyTotals(),
         },
         {
