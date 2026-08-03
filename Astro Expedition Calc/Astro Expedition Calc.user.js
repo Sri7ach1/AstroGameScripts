@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro Expedition Calc
 // @namespace    astrogame-tools
-// @version      1.4.1
+// @version      1.4.2
 // @description  Guarda y suma el histórico (7 días) de resultados de expediciones en Astrogame, aunque borres los mensajes
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js
 // @match        https://play.astrogame.org/uni25/game/messages*
@@ -256,6 +256,11 @@
         {
             name: 'expedicion_nave_alienigena_contenedor',
             regex: /restos de una nave alien[ií]gena/i,
+            extract: () => emptyTotals(),
+        },
+        {
+            name: 'expedicion_planos_agujero_negro',
+            regex: /apertura de[\s\S]*?agujero negro/i,
             extract: () => emptyTotals(),
         },
         {
