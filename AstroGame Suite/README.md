@@ -87,5 +87,23 @@ Se llegó a implementar el resumen (`fleetSummary`): tabla de flotas propias en 
 
 - **Sanitización de `innerHTML`** — de los 21 usos en el script, 4 insertaban texto que puede venir de otro jugador sin escapar (nombre de planeta origen/destino en `flyResources`, nombre de nave extraído de mensajes de expedición, patrón de resaltado propio del usuario, y la función compartida `buildResourceTable` expuesta vía `ctx`). Se añadió un helper `escapeHtml()` (también expuesto en `ctx`) y se aplicó en los 4 puntos; el resto ya insertaba solo HTML estático o literales del propio script, sin cambios.
 - **Manejo de errores en `fetch`** — de las 3 llamadas de red del script, `fetchExpeditionPage` ya comprobaba `res.ok`. Se añadió la misma comprobación a `loadFleets` (`flyResourcesWidget`) y `fetchPlanetProduction` (`resourceCalc`), que antes de este fix podían degradar en silencio a datos incorrectos (p. ej. sumar "0 producción" de un planeta cuya petición había fallado, sin avisar). El widget de Fly Resources ahora también muestra un aviso "⚠ No se pudo actualizar" en la tarjeta si el refresco falla, en vez de quedar congelado sin indicación.
-- **Modularización del fichero** — se evaluó dividir el `.user.js` (2500+ líneas) en varios ficheros vía `@require`, respaldado por un análisis del grafo de dependencias (`calls` entre `initX()` y los helpers de `ctx`). Decisión: **no aplicar todavía** — ver justificación y criterio de revisión más abajo.
-- `@version` 0.30 → 0.37, `@description` actualizado para incluir "flotas en vuelo".
+- **Modularización del fichero** — se evaluó dividir el `.user.js` (2500+ líneas) en varios ficheros vía `@require`, respaldado por un análisis del grafo de dependencias (`calls` entre `initX()` y los helpers de `ctx`). Decisión: **no aplicar todavía** — ver justificación y criterio de revisión abajo.
+- `@version` 0.35 → 0.37, `@description` actualizado para incluir "flotas en vuelo".
+
+### Modularización del fichero — por qué se pospone
+
+El split propuesto (`core.js` + `settings.js` + 6 `module-*.js` + fichero principal, cargados vía `@require`) es técnicamente correcto — el grafo de dependencias confirma que los límites entre módulos son limpios (`resourceDashboard` y `usability` son las únicas fusiones internas, todo lo demás cuelga de `ctx`). Pero introduce dos costes operativos que **hoy no existen**:
+
+1. **Pérdida del encapsulamiento del IIFE.** Todo el código vive ahora dentro de un único `(function(){...})()`, así que nada se filtra al `window` de la página del juego. Con `@require`, cada fichero se inyecta como script de nivel superior *antes* del IIFE principal — si `core.js` declarase `function getServerNow(){}` a nivel superior, esa función (y `readFleetsFromDoc`, `escapeHtml`, etc.) pasarían a ser globales de la página, con riesgo de colisión con el propio JS del juego o con otros userscripts. Mitigarlo exige introducir un namespace compartido (`window.__astroSuite`) y disciplina en cada fichero para no dejar nada suelto en el scope global.
+2. **Caché de `@require`.** GitHub raw y la caché interna de Tampermonkey pueden servir una copia vieja de `core.js` aunque el `.user.js` principal se actualice. Mitigarlo exige versionar manualmente cada URL de `@require` (`...core.js?v=0.37`) en cada release — un paso extra que, si se olvida, produce un bug silencioso y difícil de diagnosticar en remoto (un usuario con `core.js` desactualizado y el resto del script al día).
+
+Frente a eso, el coste actual de un único fichero de ~2500 líneas con secciones `// ---` plegables es, en la práctica, solo "scroll largo": no hay build/CI que se beneficie de compilar módulos por separado, no hay dos personas editando el archivo a la vez, y no se han detectado conflictos de merge ni de lógica cruzada entre módulos en esta sesión. **Conclusión: es un split correcto para un problema que todavía no existe — prematuro aplicarlo ahora.**
+
+**Criterio objetivo para revisitarlo** (cualquiera de estos, el que ocurra primero):
+
+- El fichero supera **~4000 líneas** (hoy ~2500) — el punto donde el scroll deja de compensar el plegado por secciones.
+- Aparece un **segundo colaborador** editando el script con regularidad — el split solo aporta valor real cuando hay que evitar conflictos de merge entre personas.
+- Se añaden **3 o más módulos nuevos** más allá de los 9 actuales — 16+ `init*` en un solo archivo empieza a justificar build/lint por módulo.
+- Hace falta lanzar un **hotfix aislado de un solo módulo sin tocar los demás** más de una vez — hoy no hace falta porque un solo `@version` cubre todo el fichero.
+
+Ninguno se cumple a fecha de este changelog.
