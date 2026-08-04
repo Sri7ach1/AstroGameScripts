@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         Astro ROI
 // @namespace    astrogame-tools
-// @version      1.2
+// @version      1.3
 // @description  Calcula cuántos días tardan en pagarse las mejoras de minas y de investigación de producción en Astrogame
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20ROI/Astro%20ROI.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20ROI/Astro%20ROI.user.js
@@ -110,9 +110,9 @@
         return (targetLevel / currentLevel) * Math.pow(1.1, targetLevel - currentLevel);
     }
 
-    function computeMineROI(buildingData, resourceTable, buildingId, resKey, label) {
+    function computeMineROI(buildingData, resourceTable, buildingId, resKey, label, showAll) {
         const b = buildingData[buildingId];
-        if (!b || !b.buyable) return null;
+        if (!b || (!showAll && !b.buyable)) return null;
         const currentLevel = Number(b.level);
         if (!currentLevel) return null;
         const targetLevel = currentLevel + 1;
@@ -127,13 +127,13 @@
         const costValue = weightedValue(b.costResources);
         return {
             label, currentLevel, targetLevel, costResources: b.costResources,
-            extraPerDay, resKey, days: costValue / extraValuePerDay,
+            extraPerDay, resKey, days: costValue / extraValuePerDay, buyable: !!b.buyable,
         };
     }
 
-    function computeTechROI(researchData, resourceTable, techId, resKey, label) {
+    function computeTechROI(researchData, resourceTable, techId, resKey, label, showAll) {
         const r = researchData[techId];
-        if (!r || !r.buyable) return null;
+        if (!r || (!showAll && !r.buyable)) return null;
         const currentLevel = Number(r.level);
         if (!currentLevel && currentLevel !== 0) return null;
         const targetLevel = currentLevel + 1;
@@ -150,7 +150,7 @@
         const costValue = weightedValue(r.costResources);
         return {
             label, currentLevel, targetLevel, costResources: r.costResources,
-            extraPerDay, resKey, days: costValue / extraValuePerDay,
+            extraPerDay, resKey, days: costValue / extraValuePerDay, buyable: !!r.buyable,
         };
     }
 
@@ -159,9 +159,11 @@
             .filter((k) => entry.costResources[k])
             .map((k) => `${RESOURCE_LABELS[k]} ${formatShort(entry.costResources[k])}`)
             .join(' + ');
+        const rowStyle = entry.buyable ? '' : 'style="opacity:0.6;"';
+        const notBuyableTag = entry.buyable ? '' : ' <em>(no disponible aún)</em>';
         return `
-            <tr>
-                <td style="padding:4px 10px;">${entry.label}</td>
+            <tr ${rowStyle}>
+                <td style="padding:4px 10px;">${entry.label}${notBuyableTag}</td>
                 <td style="padding:4px 10px;">${entry.currentLevel} → ${entry.targetLevel}</td>
                 <td style="padding:4px 10px;">${costParts}</td>
                 <td style="padding:4px 10px;">+${formatShort(entry.extraPerDay)} ${RESOURCE_LABELS[entry.resKey]}/día</td>
@@ -177,7 +179,12 @@
         panel.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
                 <strong>Astro ROI — Días para recuperar la inversión</strong>
-                <button id="astroRoiBtn" class="button sm warning" type="button">Actualizar</button>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <label style="font-weight:normal;font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="astroRoiShowAll"> Mostrar no comprables
+                    </label>
+                    <button id="astroRoiBtn" class="button sm warning" type="button">Actualizar</button>
+                </div>
             </div>
             <div id="astroRoiResult" style="font-size:13px;">Cargando...</div>
         `;
@@ -210,6 +217,7 @@
     function refresh(panel) {
         const btn = panel.querySelector('#astroRoiBtn');
         const resultBox = panel.querySelector('#astroRoiResult');
+        const showAll = panel.querySelector('#astroRoiShowAll').checked;
         btn.disabled = true;
         btn.textContent = 'Cargando...';
 
@@ -219,14 +227,14 @@
 
             const entries = [];
             if (buildingData) {
-                entries.push(computeMineROI(buildingData, resourceTable, '1', '901', 'Mina de Metal'));
-                entries.push(computeMineROI(buildingData, resourceTable, '2', '902', 'Mina de Cristal'));
-                entries.push(computeMineROI(buildingData, resourceTable, '3', '903', 'Sintetizador de Deuterio'));
+                entries.push(computeMineROI(buildingData, resourceTable, '1', '901', 'Mina de Metal', showAll));
+                entries.push(computeMineROI(buildingData, resourceTable, '2', '902', 'Mina de Cristal', showAll));
+                entries.push(computeMineROI(buildingData, resourceTable, '3', '903', 'Sintetizador de Deuterio', showAll));
             }
             if (researchData) {
-                entries.push(computeTechROI(researchData, resourceTable, '131', '901', 'Máxima producción de metal'));
-                entries.push(computeTechROI(researchData, resourceTable, '132', '902', 'Máxima producción de cristal'));
-                entries.push(computeTechROI(researchData, resourceTable, '133', '903', 'Máxima producción de deuterio'));
+                entries.push(computeTechROI(researchData, resourceTable, '131', '901', 'Máxima producción de metal', showAll));
+                entries.push(computeTechROI(researchData, resourceTable, '132', '902', 'Máxima producción de cristal', showAll));
+                entries.push(computeTechROI(researchData, resourceTable, '133', '903', 'Máxima producción de deuterio', showAll));
             }
 
             renderResult(resultBox, entries.filter(Boolean));
@@ -250,6 +258,7 @@
         refresh(panel);
 
         panel.querySelector('#astroRoiBtn').addEventListener('click', () => refresh(panel));
+        panel.querySelector('#astroRoiShowAll').addEventListener('change', () => refresh(panel));
     }
 
     init();

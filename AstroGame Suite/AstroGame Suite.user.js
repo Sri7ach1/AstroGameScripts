@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         AstroGame Suite
 // @namespace    astrogame-tools
-// @version      0.24
+// @version      0.30
 // @description  Suite unificada de herramientas para Astrogame (expediciones, ROI, producción, estadísticas de alianza)
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
@@ -89,6 +89,75 @@
     function toNumber(raw) {
         const value = parseInt(String(raw).replace(/\./g, ''), 10);
         return isNaN(value) ? 0 : value;
+    }
+
+    // ---------------------------------------------------------------------
+    // Parseo de flotas en vuelo (compartido entre el panel de la página de
+    // flotas y el widget global de la barra de recursos)
+    // ---------------------------------------------------------------------
+
+    function parseShortValue(text) {
+        if (!text) return 0;
+        const clean = text.replace(/\u00A0/g, ' ').trim();
+        const m = clean.match(/^(-?[\d.,]+)\s*([A-Za-zÀ-ÿ]*)$/);
+        if (!m) return 0;
+        const numPart = m[1].replace(/\./g, '').replace(',', '.');
+        const num = parseFloat(numPart);
+        if (isNaN(num)) return 0;
+        const exp = m[2] ? SUFFIXES.indexOf(m[2]) : 0;
+        const factor = exp > 0 ? Math.pow(1000, exp) : 1;
+        return num * factor;
+    }
+
+    function parseFleetResources(tooltipEl) {
+        const resources = { metal: 0, cristal: 0, deuterio: 0 };
+        if (!tooltipEl) return resources;
+        let inResources = false;
+        Array.from(tooltipEl.children).forEach((child) => {
+            if (child.classList.contains('tooltipCategory')) {
+                inResources = child.textContent.trim() === 'Recursos';
+                return;
+            }
+            if (!inResources || !child.classList.contains('tooltipItem')) return;
+            const label = child.querySelector('.label')?.textContent.trim() || '';
+            const value = parseShortValue(child.querySelector('.value')?.textContent);
+            if (label === 'Metal') resources.metal += value;
+            else if (label === 'Cristal') resources.cristal += value;
+            else if (label.startsWith('Deut')) resources.deuterio += value;
+        });
+        return resources;
+    }
+
+    function readFleetCoords(cell) {
+        if (!cell) return '';
+        const name = cell.querySelector('.planetName')?.textContent.trim() || '';
+        const coordsText = cell.querySelector('a')?.childNodes[0]?.textContent.trim() || '';
+        return coordsText ? `${name} ${coordsText}` : name;
+    }
+
+    function readFleetsFromDoc(doc) {
+        const rows = doc.querySelectorAll('table.fleetsTable tbody tr.fleetRows.own');
+        return Array.from(rows).map((row) => {
+            const timeCell = row.querySelector('td.fleets2');
+            const endTime = Number(timeCell?.getAttribute('data-fleet-end-time')) * 1000;
+            const missionLabel = row.querySelector('td.mission .tooltip')?.textContent.trim()
+                || row.querySelector('td.mission img')?.getAttribute('alt') || 'Misión';
+            const direction = row.getAttribute('aria-details') === 'returning' ? 'Volviendo' : 'De ida';
+            const source = readFleetCoords(row.querySelector('td.source'));
+            const destination = readFleetCoords(row.querySelector('td.destination'));
+            const resources = parseFleetResources(row.querySelector('.activeFleetTooltipContent'));
+
+            return { id: row.id, endTime, missionLabel, direction, source, destination, resources };
+        });
+    }
+
+    function sumFleetResources(fleets) {
+        return fleets.reduce((acc, f) => {
+            acc.metal += f.resources.metal;
+            acc.cristal += f.resources.cristal;
+            acc.deuterio += f.resources.deuterio;
+            return acc;
+        }, { metal: 0, cristal: 0, deuterio: 0 });
     }
 
     // ---------------------------------------------------------------------
@@ -203,6 +272,7 @@
                 path.startsWith('/uni25/game/buildings') ||
                 path.startsWith('/uni25/game/research'),
             init: initResourceDashboard,
+            settingsInit: registerResourceDashboardSettings,
         },
         {
             id: 'cerealStats',
@@ -226,6 +296,18 @@
             matches: () => true,
             init: initUsability,
             settingsInit: registerUsabilitySettings,
+        },
+        {
+            id: 'flyResources',
+            label: 'Fly Resources',
+            matches: (path) => path.startsWith('/uni25/game/fleetTable'),
+            init: initFlyResources,
+        },
+        {
+            id: 'flyResourcesWidget',
+            label: 'Fly Resources (widget global)',
+            matches: () => true,
+            init: initFlyResourcesWidget,
         },
     ];
 
@@ -893,6 +975,21 @@
     // Módulo: Dashboard de recursos (fusiona Resource Calc + ROI)
     // ---------------------------------------------------------------------
 
+    function registerResourceDashboardSettings(ctx) {
+        ctx.registerSettingsSection('resourceDashboard', (container, settings) => {
+            container.innerHTML = `
+                <div style="margin-bottom:6px;">Astro ROI (minas e investigaciones de producción)</div>
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="roiShowAllDefault" ${settings.roiShowAllDefault ? 'checked' : ''} />
+                    <span>Mostrar mejoras no comprables por defecto</span>
+                </label>
+            `;
+            container.querySelector('#roiShowAllDefault').addEventListener('change', (e) => {
+                ctx.setModuleSettings('resourceDashboard', { roiShowAllDefault: e.target.checked });
+            });
+        });
+    }
+
     function initResourceDashboard(ctx) {
         if (window.location.pathname.startsWith('/uni25/game/feedstock')) {
             initResourceCalc(ctx);
@@ -979,9 +1076,9 @@
             return (targetLevel / currentLevel) * Math.pow(1.1, targetLevel - currentLevel);
         }
 
-        function computeMineROI(buildingData, resourceTable, buildingId, resKey, label) {
+        function computeMineROI(buildingData, resourceTable, buildingId, resKey, label, showAll) {
             const b = buildingData[buildingId];
-            if (!b || !b.buyable) return null;
+            if (!b || (!showAll && !b.buyable)) return null;
             const currentLevel = Number(b.level);
             if (!currentLevel) return null;
             const targetLevel = currentLevel + 1;
@@ -996,13 +1093,13 @@
             const costValue = weightedValue(b.costResources);
             return {
                 label, currentLevel, targetLevel, costResources: b.costResources,
-                extraPerDay, resKey, days: costValue / extraValuePerDay,
+                extraPerDay, resKey, days: costValue / extraValuePerDay, buyable: !!b.buyable,
             };
         }
 
-        function computeTechROI(researchData, resourceTable, techId, resKey, label) {
+        function computeTechROI(researchData, resourceTable, techId, resKey, label, showAll) {
             const r = researchData[techId];
-            if (!r || !r.buyable) return null;
+            if (!r || (!showAll && !r.buyable)) return null;
             const currentLevel = Number(r.level);
             if (!currentLevel && currentLevel !== 0) return null;
             const targetLevel = currentLevel + 1;
@@ -1019,7 +1116,7 @@
             const costValue = weightedValue(r.costResources);
             return {
                 label, currentLevel, targetLevel, costResources: r.costResources,
-                extraPerDay, resKey, days: costValue / extraValuePerDay,
+                extraPerDay, resKey, days: costValue / extraValuePerDay, buyable: !!r.buyable,
             };
         }
 
@@ -1028,9 +1125,11 @@
                 .filter((k) => entry.costResources[k])
                 .map((k) => `${RESOURCE_LABELS[k]} ${ctx.formatShort(entry.costResources[k])}`)
                 .join(' + ');
+            const rowStyle = entry.buyable ? '' : 'style="opacity:0.6;"';
+            const notBuyableTag = entry.buyable ? '' : ' <em>(no disponible aún)</em>';
             return `
-                <tr>
-                    <td style="padding:4px 10px;">${entry.label}</td>
+                <tr ${rowStyle}>
+                    <td style="padding:4px 10px;">${entry.label}${notBuyableTag}</td>
                     <td style="padding:4px 10px;">${entry.currentLevel} → ${entry.targetLevel}</td>
                     <td style="padding:4px 10px;">${costParts}</td>
                     <td style="padding:4px 10px;">+${ctx.formatShort(entry.extraPerDay)} ${RESOURCE_LABELS[entry.resKey]}/día</td>
@@ -1062,9 +1161,10 @@
             `;
         }
 
-        function refresh(primaryBtn, body) {
+        function refresh(primaryBtn, body, showAllCheckbox) {
             primaryBtn.disabled = true;
             primaryBtn.textContent = 'Cargando...';
+            const showAll = showAllCheckbox.checked;
 
             try {
                 const { buildingData, researchData, resourceTable } = getPageData();
@@ -1072,14 +1172,14 @@
 
                 const entries = [];
                 if (buildingData) {
-                    entries.push(computeMineROI(buildingData, resourceTable, '1', '901', 'Mina de Metal'));
-                    entries.push(computeMineROI(buildingData, resourceTable, '2', '902', 'Mina de Cristal'));
-                    entries.push(computeMineROI(buildingData, resourceTable, '3', '903', 'Sintetizador de Deuterio'));
+                    entries.push(computeMineROI(buildingData, resourceTable, '1', '901', 'Mina de Metal', showAll));
+                    entries.push(computeMineROI(buildingData, resourceTable, '2', '902', 'Mina de Cristal', showAll));
+                    entries.push(computeMineROI(buildingData, resourceTable, '3', '903', 'Sintetizador de Deuterio', showAll));
                 }
                 if (researchData) {
-                    entries.push(computeTechROI(researchData, resourceTable, '131', '901', 'Máxima producción de metal'));
-                    entries.push(computeTechROI(researchData, resourceTable, '132', '902', 'Máxima producción de cristal'));
-                    entries.push(computeTechROI(researchData, resourceTable, '133', '903', 'Máxima producción de deuterio'));
+                    entries.push(computeTechROI(researchData, resourceTable, '131', '901', 'Máxima producción de metal', showAll));
+                    entries.push(computeTechROI(researchData, resourceTable, '132', '902', 'Máxima producción de cristal', showAll));
+                    entries.push(computeTechROI(researchData, resourceTable, '133', '903', 'Máxima producción de deuterio', showAll));
                 }
 
                 renderResult(body, entries.filter(Boolean));
@@ -1103,11 +1203,186 @@
             primaryLabel: 'Actualizar',
             primaryId: 'astroRoiBtn',
         });
+
+        const roiShowAllDefault = ctx.getModuleSettings('resourceDashboard').roiShowAllDefault === true;
+        const showAllLabel = document.createElement('label');
+        showAllLabel.style.cssText = 'font-weight:normal;font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;';
+        showAllLabel.innerHTML = `<input type="checkbox" id="astroRoiShowAll" ${roiShowAllDefault ? 'checked' : ''}> Mostrar no comprables`;
+        primaryBtn.parentElement.insertBefore(showAllLabel, primaryBtn);
+        const showAllCheckbox = showAllLabel.querySelector('#astroRoiShowAll');
+
         ctx.insertPanelAfter(header, panel);
+        body.textContent = 'Cargando...';
+
+        refresh(primaryBtn, body, showAllCheckbox);
+        primaryBtn.addEventListener('click', () => refresh(primaryBtn, body, showAllCheckbox));
+        showAllCheckbox.addEventListener('change', () => refresh(primaryBtn, body, showAllCheckbox));
+    }
+
+    // ---------------------------------------------------------------------
+    // Módulo: Fly Resources
+    // ---------------------------------------------------------------------
+
+    function initFlyResources(ctx) {
+        function formatDuration(ms) {
+            const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(h)}:${pad(m)}:${pad(s)}`;
+        }
+
+        function renderRow(fleet, now) {
+            return `
+                <tr>
+                    <td style="padding:4px 10px;">${formatDuration(fleet.endTime - now)}</td>
+                    <td style="padding:4px 10px;">${fleet.missionLabel} (${fleet.direction})</td>
+                    <td style="padding:4px 10px;">${fleet.source}</td>
+                    <td style="padding:4px 10px;">${fleet.destination}</td>
+                    <td style="padding:4px 10px;">${ctx.formatShort(fleet.resources.metal)}</td>
+                    <td style="padding:4px 10px;">${ctx.formatShort(fleet.resources.cristal)}</td>
+                    <td style="padding:4px 10px;">${ctx.formatShort(fleet.resources.deuterio)}</td>
+                </tr>
+            `;
+        }
+
+        function renderResult(container, fleets) {
+            if (fleets.length === 0) {
+                container.innerHTML = '<div>No hay flotas propias en vuelo ahora mismo.</div>';
+                return;
+            }
+            const now = ctx.getServerNow();
+            fleets.sort((a, b) => a.endTime - b.endTime);
+            const totals = sumFleetResources(fleets);
+
+            const rows = fleets.map((f) => renderRow(f, now)).join('');
+            container.innerHTML = `
+                <table class="resourcesTable" style="width:100%;">
+                    <tbody>
+                        <tr class="tableHeader">
+                            <td style="padding:4px 10px;">Llegada</td>
+                            <td style="padding:4px 10px;">Misión</td>
+                            <td style="padding:4px 10px;">Origen</td>
+                            <td style="padding:4px 10px;">Destino</td>
+                            <td style="padding:4px 10px;">Metal</td>
+                            <td style="padding:4px 10px;">Cristal</td>
+                            <td style="padding:4px 10px;">Deutério</td>
+                        </tr>
+                        ${rows}
+                        <tr style="font-weight:bold;border-top:1px solid rgba(255,255,255,.15);">
+                            <td style="padding:4px 10px;" colspan="4">Total (${fleets.length} flotas)</td>
+                            <td style="padding:4px 10px;">${ctx.formatShort(totals.metal)}</td>
+                            <td style="padding:4px 10px;">${ctx.formatShort(totals.cristal)}</td>
+                            <td style="padding:4px 10px;">${ctx.formatShort(totals.deuterio)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function refresh(primaryBtn, body) {
+            primaryBtn.disabled = true;
+            primaryBtn.textContent = 'Cargando...';
+            try {
+                renderResult(body, readFleetsFromDoc(document));
+            } catch (err) {
+                body.textContent = 'Error al calcular: ' + err.message;
+                console.error('[AstroGame Suite] [flyResources]', err);
+            } finally {
+                primaryBtn.disabled = false;
+                primaryBtn.textContent = 'Actualizar';
+            }
+        }
+
+        if (document.getElementById('astroFlyResourcesPanel')) return;
+
+        const table = document.querySelector('table.fleetsTable');
+        if (!table || !table.parentElement) return;
+
+        const { panel, primaryBtn, body } = ctx.createPanel({
+            id: 'astroFlyResourcesPanel',
+            title: 'Fly Resources — Recursos en vuelo',
+            primaryLabel: 'Actualizar',
+            primaryId: 'astroFlyResourcesBtn',
+        });
+        table.parentElement.insertBefore(panel, table);
         body.textContent = 'Cargando...';
 
         refresh(primaryBtn, body);
         primaryBtn.addEventListener('click', () => refresh(primaryBtn, body));
+    }
+
+    // ---------------------------------------------------------------------
+    // Módulo: Fly Resources — widget global (menú lateral, cualquier página)
+    // ---------------------------------------------------------------------
+
+    function initFlyResourcesWidget(ctx) {
+        const CACHE_KEY = 'astro_fly_resources_widget_cache_v1';
+        const CACHE_TTL_MS = 60 * 1000;
+        const CARD_ID = 'astroFlyResourcesCard';
+
+        function renderCard(totals, count, stale) {
+            let card = document.getElementById(CARD_ID);
+            if (!card) {
+                const list = document.querySelector('.sidebarNavList');
+                if (!list) return;
+                card = document.createElement('div');
+                card.id = CARD_ID;
+                list.insertBefore(card, list.firstChild);
+            }
+            card.style.cssText = `
+                margin:6px 10px 10px;padding:8px 12px;border-radius:8px;
+                background:var(--secondary-700,#1f2937);color:var(--text-primary,#e2e8f0);
+                font-family:inherit;opacity:${stale ? '0.6' : '1'};
+            `;
+            card.innerHTML = `
+                <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;">
+                    <span>🚀</span><span>En vuelo${count ? ` (${count})` : ''}</span>
+                </div>
+                <div style="font-size:11px;opacity:0.8;margin-top:4px;line-height:1.6;">
+                    <div>Metal: ${ctx.formatShort(totals.metal)}</div>
+                    <div>Cristal: ${ctx.formatShort(totals.cristal)}</div>
+                    <div>Deutério: ${ctx.formatShort(totals.deuterio)}</div>
+                </div>
+            `;
+        }
+
+        async function loadFleets() {
+            if (window.location.pathname.startsWith('/uni25/game/fleetTable')) {
+                return readFleetsFromDoc(document);
+            }
+            const res = await fetch('https://play.astrogame.org/uni25/game/fleetTable', { credentials: 'include' });
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            return readFleetsFromDoc(doc);
+        }
+
+        async function refresh() {
+            try {
+                const fleets = await loadFleets();
+                const totals = sumFleetResources(fleets);
+                ctx.writeJSON(CACHE_KEY, { timestamp: ctx.getServerNow(), totals, count: fleets.length });
+                renderCard(totals, fleets.length, false);
+            } catch (err) {
+                console.error('[AstroGame Suite] [flyResourcesWidget]', err);
+            }
+        }
+
+        if (document.getElementById(CARD_ID)) return;
+        if (!document.querySelector('.sidebarNavList')) return;
+
+        const cached = ctx.readJSON(CACHE_KEY, null);
+        if (cached && ctx.getServerNow() - cached.timestamp < CACHE_TTL_MS) {
+            renderCard(cached.totals, cached.count, false);
+            return;
+        }
+        if (cached) {
+            renderCard(cached.totals, cached.count, true);
+        } else {
+            renderCard({ metal: 0, cristal: 0, deuterio: 0 }, 0, true);
+        }
+        refresh();
     }
 
     // ---------------------------------------------------------------------
