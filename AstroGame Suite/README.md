@@ -80,3 +80,12 @@ Se llegó a implementar (`accountPanel`): edificios/instalaciones por planeta, f
 ### Detalle de viabilidad — Movimientos de flota (resumen, phalanx, fleetsave)
 
 Se llegó a implementar el resumen (`fleetSummary`): tabla de flotas propias en movimiento (`tr.fleetRows.own`) con countdown en vivo (`data-fleet-end-time` vs. `ctx.getServerNow()`), misión, origen/destino y composición leída del tooltip. Se retiró por considerarse sin utilidad real. Phalanx y fleetsave quedan sin inspeccionar; no se retoma esta línea salvo petición explícita.
+
+## Changelog
+
+### 0.37 (auditoría de seguridad y robustez)
+
+- **Sanitización de `innerHTML`** — de los 21 usos en el script, 4 insertaban texto que puede venir de otro jugador sin escapar (nombre de planeta origen/destino en `flyResources`, nombre de nave extraído de mensajes de expedición, patrón de resaltado propio del usuario, y la función compartida `buildResourceTable` expuesta vía `ctx`). Se añadió un helper `escapeHtml()` (también expuesto en `ctx`) y se aplicó en los 4 puntos; el resto ya insertaba solo HTML estático o literales del propio script, sin cambios.
+- **Manejo de errores en `fetch`** — de las 3 llamadas de red del script, `fetchExpeditionPage` ya comprobaba `res.ok`. Se añadió la misma comprobación a `loadFleets` (`flyResourcesWidget`) y `fetchPlanetProduction` (`resourceCalc`), que antes de este fix podían degradar en silencio a datos incorrectos (p. ej. sumar "0 producción" de un planeta cuya petición había fallado, sin avisar). El widget de Fly Resources ahora también muestra un aviso "⚠ No se pudo actualizar" en la tarjeta si el refresco falla, en vez de quedar congelado sin indicación.
+- **Modularización del fichero** — se evaluó dividir el `.user.js` (2500+ líneas) en varios ficheros vía `@require`, respaldado por un análisis del grafo de dependencias (`calls` entre `initX()` y los helpers de `ctx`). Decisión: **no aplicar todavía** — ver justificación y criterio de revisión más abajo.
+- `@version` 0.30 → 0.37, `@description` actualizado para incluir "flotas en vuelo".

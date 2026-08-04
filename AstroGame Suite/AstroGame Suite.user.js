@@ -2,8 +2,8 @@
 // @author       LoneW0lf
 // @name         AstroGame Suite
 // @namespace    astrogame-tools
-// @version      0.35
-// @description  Suite unificada de herramientas para Astrogame (expediciones, ROI, producción, estadísticas de alianza)
+// @version      0.37
+// @description  Suite unificada de herramientas para Astrogame (expediciones, ROI, producción, flotas en vuelo, estadísticas de alianza)
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
 // @downloadURL  https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
@@ -89,6 +89,20 @@
     function toNumber(raw) {
         const value = parseInt(String(raw).replace(/\./g, ''), 10);
         return isNaN(value) ? 0 : value;
+    }
+
+    // ---------------------------------------------------------------------
+    // Escapado de HTML (para texto que viene del juego y puede estar
+    // controlado por otro jugador: nombres de planeta, alianza, naves...)
+    // ---------------------------------------------------------------------
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // ---------------------------------------------------------------------
@@ -210,13 +224,16 @@
     }
 
     function buildResourceTable(headerCells, rows) {
-        const headerHtml = headerCells.map((c) => `<td style="padding:4px 10px;">${c}</td>`).join('');
+        // Escapa siempre: aunque hoy no hay llamadas internas a esta función,
+        // se expone vía ctx a cualquier módulo, y un módulo futuro podría
+        // pasarle texto controlado por otro jugador (nombre de planeta, etc.).
+        const headerHtml = headerCells.map((c) => `<td style="padding:4px 10px;">${escapeHtml(c)}</td>`).join('');
         const rowsHtml = rows.map((row) => {
             const cellsHtml = row.map((cell) => {
                 if (cell && typeof cell === 'object' && 'short' in cell) {
-                    return `<td class="tooltip-parent" style="padding:4px 10px;">${cell.short}<span class="tooltip topCenter">${cell.full}</span></td>`;
+                    return `<td class="tooltip-parent" style="padding:4px 10px;">${escapeHtml(cell.short)}<span class="tooltip topCenter">${escapeHtml(cell.full)}</span></td>`;
                 }
-                return `<td style="padding:4px 10px;">${cell}</td>`;
+                return `<td style="padding:4px 10px;">${escapeHtml(cell)}</td>`;
             }).join('');
             return `<tr>${cellsHtml}</tr>`;
         }).join('');
@@ -774,7 +791,7 @@
             if (shipNames.length > 0) {
                 const shipRows = shipNames.map((name) => `
                     <tr>
-                        <td style="padding:4px 10px;">${name}</td>
+                        <td style="padding:4px 10px;">${ctx.escapeHtml(name)}</td>
                         <td style="padding:4px 10px;">${summary.totalsToday.shipsGained[name] || 0}</td>
                         <td style="padding:4px 10px;">${summary.totalsWeek.shipsGained[name] || 0}</td>
                     </tr>
@@ -1247,12 +1264,16 @@
         }
 
         function renderRow(fleet, now) {
+            // missionLabel/source/destination leen texto del DOM del juego
+            // (nombre de misión, nombre de planeta origen/destino) y el
+            // destino puede pertenecer a otro jugador, así que se escapan
+            // antes de insertarlos vía innerHTML.
             return `
                 <tr>
                     <td style="padding:4px 10px;">${formatDuration(fleet.endTime - now)}</td>
-                    <td style="padding:4px 10px;">${fleet.missionLabel} (${fleet.direction})</td>
-                    <td style="padding:4px 10px;">${fleet.source}</td>
-                    <td style="padding:4px 10px;">${fleet.destination}</td>
+                    <td style="padding:4px 10px;">${ctx.escapeHtml(fleet.missionLabel)} (${fleet.direction})</td>
+                    <td style="padding:4px 10px;">${ctx.escapeHtml(fleet.source)}</td>
+                    <td style="padding:4px 10px;">${ctx.escapeHtml(fleet.destination)}</td>
                     <td style="padding:4px 10px;">${ctx.formatShort(fleet.resources.metal)}</td>
                     <td style="padding:4px 10px;">${ctx.formatShort(fleet.resources.cristal)}</td>
                     <td style="padding:4px 10px;">${ctx.formatShort(fleet.resources.deuterio)}</td>
@@ -1361,7 +1382,7 @@
             countdownIntervalId = setInterval(tick, 1000);
         }
 
-        function renderCard(totals, count, maxEndTime, stale) {
+        function renderCard(totals, count, maxEndTime, stale, errored) {
             let card = document.getElementById(CARD_ID);
             if (!card) {
                 const list = document.querySelector('.sidebarNavList');
@@ -1384,6 +1405,7 @@
                     <div>Cristal: ${ctx.formatShort(totals.cristal)}</div>
                     <div>Deutério: ${ctx.formatShort(totals.deuterio)}</div>
                     ${maxEndTime ? `<div id="${CLOCK_ID}" style="margin-top:2px;font-weight:600;"></div>` : ''}
+                    ${errored ? '<div style="margin-top:4px;color:var(--warning-400,#fbbf24);">⚠ No se pudo actualizar</div>' : ''}
                 </div>
             `;
             startCountdown(maxEndTime);
@@ -1394,6 +1416,9 @@
                 return readFleetsFromDoc(document);
             }
             const res = await fetch('https://play.astrogame.org/uni25/game/fleetTable', { credentials: 'include' });
+            if (!res.ok) {
+                throw new Error(`Respuesta HTTP ${res.status} al pedir la Base de la Flota`);
+            }
             const html = await res.text();
             const doc = new DOMParser().parseFromString(html, 'text/html');
             return readFleetsFromDoc(doc);
@@ -1414,6 +1439,14 @@
                 renderCard(totals, fleets.length, maxEndTime, false);
             } catch (err) {
                 console.error('[AstroGame Suite] [flyResourcesWidget]', err);
+                // Degradar con gracia: seguir mostrando el último dato conocido
+                // (si lo hay) en vez de dejar la tarjeta congelada sin avisar.
+                const cached = ctx.readJSON(CACHE_KEY, null);
+                if (cached) {
+                    renderCard(cached.totals, cached.count, cached.maxEndTime, true, true);
+                } else {
+                    renderCard({ metal: 0, cristal: 0, deuterio: 0 }, 0, null, true, true);
+                }
             }
         }
 
@@ -1467,6 +1500,9 @@
             const res = await fetch(`https://play.astrogame.org/uni25/game/feedstock?cp=${planetId}`, {
                 credentials: 'include'
             });
+            if (!res.ok) {
+                throw new Error(`Respuesta HTTP ${res.status} al pedir producción del planeta ${planetId}`);
+            }
             const html = await res.text();
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const rows = doc.querySelectorAll('.resourcesTable tbody tr.tableRow.production');
@@ -1912,7 +1948,7 @@
                 const rowsHtml = rules.map((rule, i) => `
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                         <input type="text" class="astroHighlightPattern" data-index="${i}"
-                               value="${(rule.pattern || '').replace(/"/g, '&quot;')}"
+                               value="${ctx.escapeHtml(rule.pattern || '')}"
                                placeholder="Nombre de jugador o alianza"
                                style="flex:1;" />
                         <input type="color" class="astroHighlightColor" data-index="${i}" value="${rule.color || '#facc15'}" />
@@ -2479,6 +2515,7 @@
         formatFull,
         formatShort,
         toNumber,
+        escapeHtml,
         readJSON,
         writeJSON,
         createPanel,
