@@ -2,7 +2,7 @@
 // @author       LoneW0lf
 // @name         AstroGame Suite
 // @namespace    astrogame-tools
-// @version      0.30
+// @version      0.35
 // @description  Suite unificada de herramientas para Astrogame (expediciones, ROI, producción, estadísticas de alianza)
 // @source       https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
 // @updateURL    https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js
@@ -137,7 +137,14 @@
 
     function readFleetsFromDoc(doc) {
         const rows = doc.querySelectorAll('table.fleetsTable tbody tr.fleetRows.own');
-        return Array.from(rows).map((row) => {
+        // Una misión con vuelta aparece como dos filas con el mismo data-group
+        // (tramo de ida y tramo de vuelta ya programado) y el mismo cargamento
+        // en ambas, porque es la misma mercancía. Solo el tramo con el ETA más
+        // próximo está realmente en curso ahora mismo; el otro es un tramo
+        // futuro todavía no iniciado. Sin deduplicar, se contaba el mismo
+        // cargamento dos veces.
+        const byGroup = new Map();
+        rows.forEach((row) => {
             const timeCell = row.querySelector('td.fleets2');
             const endTime = Number(timeCell?.getAttribute('data-fleet-end-time')) * 1000;
             const missionLabel = row.querySelector('td.mission .tooltip')?.textContent.trim()
@@ -146,9 +153,15 @@
             const source = readFleetCoords(row.querySelector('td.source'));
             const destination = readFleetCoords(row.querySelector('td.destination'));
             const resources = parseFleetResources(row.querySelector('.activeFleetTooltipContent'));
+            const group = row.getAttribute('data-group') || row.id;
 
-            return { id: row.id, endTime, missionLabel, direction, source, destination, resources };
+            const fleet = { id: row.id, group, endTime, missionLabel, direction, source, destination, resources };
+            const existing = byGroup.get(group);
+            if (!existing || fleet.endTime < existing.endTime) {
+                byGroup.set(group, fleet);
+            }
         });
+        return Array.from(byGroup.values());
     }
 
     function sumFleetResources(fleets) {
@@ -1321,8 +1334,34 @@
         const CACHE_KEY = 'astro_fly_resources_widget_cache_v1';
         const CACHE_TTL_MS = 60 * 1000;
         const CARD_ID = 'astroFlyResourcesCard';
+        const CLOCK_ID = 'astroFlyResourcesClock';
 
-        function renderCard(totals, count, stale) {
+        let countdownIntervalId = null;
+
+        function formatDuration(ms) {
+            const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(h)}:${pad(m)}:${pad(s)}`;
+        }
+
+        function startCountdown(maxEndTime) {
+            if (countdownIntervalId) clearInterval(countdownIntervalId);
+            if (!maxEndTime) return;
+
+            function tick() {
+                const el = document.getElementById(CLOCK_ID);
+                if (!el) { clearInterval(countdownIntervalId); return; }
+                el.textContent = `Última entrega: ${formatDuration(maxEndTime - ctx.getServerNow())}`;
+            }
+
+            tick();
+            countdownIntervalId = setInterval(tick, 1000);
+        }
+
+        function renderCard(totals, count, maxEndTime, stale) {
             let card = document.getElementById(CARD_ID);
             if (!card) {
                 const list = document.querySelector('.sidebarNavList');
@@ -1344,8 +1383,10 @@
                     <div>Metal: ${ctx.formatShort(totals.metal)}</div>
                     <div>Cristal: ${ctx.formatShort(totals.cristal)}</div>
                     <div>Deutério: ${ctx.formatShort(totals.deuterio)}</div>
+                    ${maxEndTime ? `<div id="${CLOCK_ID}" style="margin-top:2px;font-weight:600;"></div>` : ''}
                 </div>
             `;
+            startCountdown(maxEndTime);
         }
 
         async function loadFleets() {
@@ -1362,8 +1403,15 @@
             try {
                 const fleets = await loadFleets();
                 const totals = sumFleetResources(fleets);
-                ctx.writeJSON(CACHE_KEY, { timestamp: ctx.getServerNow(), totals, count: fleets.length });
-                renderCard(totals, fleets.length, false);
+                // Solo cuentan los tramos "De ida" que además llevan carga: un
+                // ataque también es "De ida" pero no entrega recursos, y un
+                // tramo "Volviendo" ya entregó su carga y solo regresa vacío/de
+                // vuelta al origen. Ninguno de los dos es una "entrega" real.
+                const hasCargo = (f) => f.resources.metal > 0 || f.resources.cristal > 0 || f.resources.deuterio > 0;
+                const deliveryFleets = fleets.filter((f) => f.direction !== 'Volviendo' && hasCargo(f));
+                const maxEndTime = deliveryFleets.length ? Math.max(...deliveryFleets.map((f) => f.endTime)) : null;
+                ctx.writeJSON(CACHE_KEY, { timestamp: ctx.getServerNow(), totals, count: fleets.length, maxEndTime });
+                renderCard(totals, fleets.length, maxEndTime, false);
             } catch (err) {
                 console.error('[AstroGame Suite] [flyResourcesWidget]', err);
             }
@@ -1374,13 +1422,13 @@
 
         const cached = ctx.readJSON(CACHE_KEY, null);
         if (cached && ctx.getServerNow() - cached.timestamp < CACHE_TTL_MS) {
-            renderCard(cached.totals, cached.count, false);
+            renderCard(cached.totals, cached.count, cached.maxEndTime, false);
             return;
         }
         if (cached) {
-            renderCard(cached.totals, cached.count, true);
+            renderCard(cached.totals, cached.count, cached.maxEndTime, true);
         } else {
-            renderCard({ metal: 0, cristal: 0, deuterio: 0 }, 0, true);
+            renderCard({ metal: 0, cristal: 0, deuterio: 0 }, 0, null, true);
         }
         refresh();
     }
@@ -1634,10 +1682,10 @@
                 padRight('Miembro', NAME_W) + padRight('Posición', POS_W) +
                 padRight('Puntos', PTS_W) + 'Δ';
 
-            const ANSI_RESET = '[0m';
-            const ANSI_GREEN = '[0;32m';
-            const ANSI_RED = '[0;31m';
-            const ANSI_YELLOW = '[0;33m';
+            const ANSI_RESET = '[0m';
+            const ANSI_GREEN = '[0;32m';
+            const ANSI_RED = '[0;31m';
+            const ANSI_YELLOW = '[0;33m';
 
             const tableLines = evolution.rows.map((r) => {
                 const pointsStr = r.pointsNow.toLocaleString('es-ES');
