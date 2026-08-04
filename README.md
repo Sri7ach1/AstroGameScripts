@@ -1,39 +1,23 @@
 # AstroGameScripts
 
-Colección de userscripts (Tampermonkey/Violentmonkey) para [Astrogame](https://play.astrogame.org), un juego de navegador estilo OGame. Cada script vive en su propia carpeta, es independiente de los demás, y se activa solo en las páginas del juego que le corresponden (`@match`).
+Userscript (Tampermonkey/Violentmonkey) para [Astrogame](https://play.astrogame.org), un juego de navegador estilo OGame.
 
-## Scripts
+## Script activo
 
-| Script | Se activa en | Qué hace |
-|---|---|---|
-| [Astro Expedition Calc](Astro%20Expedition%20Calc/README.md) | Mensajes | Suma el botín de expediciones de los últimos 7 días, aunque borres los mensajes |
-| [Astro Expedition Reminder](Astro%20Expedition%20Reminder/README.md) | Cualquier página | Avisa si no tienes ninguna expedición volando ahora mismo |
-| [Astro ROI](Astro%20ROI/README.md) | Recursos / Investigación | Calcula los días para recuperar la inversión de mejorar una mina o investigación de producción |
-| [Astro Resource Calc](Astro%20Resource%20Calc/README.md) | Recursos | Suma la producción de recursos de todos tus planetas a la vez |
-| [Astro Cereal Stats](Astro%20Cereal%20Stats/README.md) | Miembros de la alianza | Genera la evolución de puntos de la alianza en Markdown para Discord |
+- **[AstroGame Suite](AstroGame%20Suite/README.md)** — instalación única que reúne todas las herramientas (expediciones, ROI, producción, flotas en vuelo, estadísticas de alianza, resaltado, usabilidad) en un solo userscript con un panel de ajustes común.
 
-Cada carpeta tiene su propio `README.md` con el detalle de funcionamiento del script correspondiente.
+## Scripts independientes (deprecados)
 
-## En desarrollo
-
-- [AstroGame Suite](AstroGame%20Suite/README.md) — suite única que unifica los 5 scripts anteriores bajo una sola instalación (Fase 0 y 1 completadas: núcleo de settings/formato/UI + los 5 módulos migrados). Los scripts individuales se mantienen por ahora como referencia/fallback.
+Los scripts originales, uno por herramienta, se han retirado en favor de AstroGame Suite y se movieron a [`DEPRECATED/`](DEPRECATED/) como referencia histórica. No reciben actualizaciones y no deberían instalarse en un perfil nuevo — instala solo AstroGame Suite.
 
 ## Instalación
 
 1. Instala la extensión [Tampermonkey](https://www.tampermonkey.net/) (o [Violentmonkey](https://violentmonkey.github.io/)) en tu navegador.
-2. Haz clic en el enlace raw del script que quieras instalar (tabla abajo). Tampermonkey detectará el userscript automáticamente y abrirá la pantalla de instalación.
+2. Haz clic en el [enlace raw de AstroGame Suite](https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/AstroGame%20Suite/AstroGame%20Suite.user.js). Tampermonkey detectará el userscript automáticamente y abrirá la pantalla de instalación.
 3. Confirma la instalación con **Instalar**.
-4. Entra a [Astrogame](https://play.astrogame.org) y navega a la página correspondiente (`@match` de la tabla de scripts) para verlo en acción.
+4. Entra a [Astrogame](https://play.astrogame.org) y navega por el juego; cada módulo se activa solo en la página que le corresponde.
 
-Al actualizar un script en el repositorio, Tampermonkey detecta el cambio en el enlace raw y ofrece actualizarlo automáticamente (según su configuración de "Check for userscript updates").
-
-| Script | Enlace raw |
-|---|---|
-| Astro Expedition Calc | https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Calc/Astro%20Expedition%20Calc.user.js |
-| Astro Expedition Reminder | https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Expedition%20Reminder/Astro%20Expedition%20Reminder.user.js |
-| Astro ROI | https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20ROI/Astro%20ROI.user.js |
-| Astro Resource Calc | https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Resource%20Calc/Astro%20Resource%20Calc.user.js |
-| Astro Cereal Stats | https://raw.githubusercontent.com/Sri7ach1/AstroGameScripts/main/Astro%20Cereal%20Stats/Astro%20Cereal%20Stats.user.js |
+Al actualizar el script en el repositorio, Tampermonkey detecta el cambio en el enlace raw y ofrece actualizarlo automáticamente (según su configuración de "Check for userscript updates").
 
 ## Convenciones comunes entre scripts
 

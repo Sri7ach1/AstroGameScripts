@@ -1,8 +1,8 @@
 # AstroGame Suite
 
-Userscript único (Tampermonkey/Violentmonkey) que unifica las 5 herramientas de [AstroGameScripts](../README.md) en una sola instalación, con un registro de módulos compartido en vez de 5 scripts independientes.
+Userscript único (Tampermonkey/Violentmonkey) que unifica las herramientas de [AstroGameScripts](../README.md) en una sola instalación, con un registro de módulos compartido en vez de scripts independientes.
 
-**Estado actual: Fase 0 y Fase 1 completadas y verificadas en el juego real** (sin errores en consola, activación/desactivación de módulos funcionando). **Fase 2 en marcha**. Los scripts individuales de las otras carpetas se mantienen por ahora como referencia/fallback.
+**Estado actual: única instalación soportada.** Los scripts individuales que dieron origen a estos módulos se movieron a [`DEPRECATED/`](../DEPRECATED/) como referencia histórica y no reciben actualizaciones.
 
 ## Por qué existe
 
@@ -32,9 +32,9 @@ Cada módulo recibe un `ctx` con todas las utilidades del núcleo (`getServerNow
 
 | Módulo (`id`) | Se activa en | Origen |
 |---|---|---|
-| `expeditionCalc` | Mensajes | [Astro Expedition Calc](../Astro%20Expedition%20Calc/) |
-| `expeditionReminder` | Cualquier página | [Astro Expedition Reminder](../Astro%20Expedition%20Reminder/) |
-| `cerealStats` | Miembros de la alianza | [Astro Cereal Stats](../Astro%20Cereal%20Stats/) |
+| `expeditionCalc` | Mensajes | [Astro Expedition Calc](../DEPRECATED/Astro%20Expedition%20Calc/) (deprecado) |
+| `expeditionReminder` | Cualquier página | [Astro Expedition Reminder](../DEPRECATED/Astro%20Expedition%20Reminder/) (deprecado) |
+| `cerealStats` | Miembros de la alianza | [Astro Cereal Stats](../DEPRECATED/Astro%20Cereal%20Stats/) (deprecado) |
 
 ## Módulos nuevos (Fase 2)
 
